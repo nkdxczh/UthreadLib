@@ -8,9 +8,9 @@ CXXFLAGS  = -fno-strict-aliasing -Wall -D_REENTRANT -MMD -msse2 -mfpmath=sse \
 OBJDIR    = ./obj
 SRCDIR    = ./src
 BASENAMES = testA uthread
-SOURCES   = $(patsubst %, %.cpp, $(SRCDIR)/$(BASENAMES)))
-OFILES    = $(patsubst %, $(OBJDIR)/%.o, $(SRCDIR)/$(BASENAMES) )
-DEPS      = $(patsubst %, $(OBJDIR)/%.d, $(SRCDIR)/$(BASENAMES) )
+SOURCES   = $(patsubst %, %.cpp, $(BASENAMES)))
+OFILES    = $(patsubst %, $(OBJDIR)/%.o, $(BASENAMES) )
+DEPS      = $(patsubst %, $(OBJDIR)/%.d, $(BASENAMES) )
 GOAL      = $(OBJDIR)/testA
 
 # build rules
