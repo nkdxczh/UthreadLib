@@ -9,6 +9,7 @@
 #define _UTHREAD_H
 
 #define thread_id unsigned
+#define uthread_mutex_t unsigned
 
 #define THREAD_T thread_id
 #define THREAD_CREATE uthread_create
@@ -23,22 +24,14 @@ void uthread_exit(void* val_ptr);
 int uthread_self();
 void uthread_yield();
 
-typedef struct{
-    unsigned id;
-    unsigned kind;
-    bool taken;
-    thread_id owner;
-} uthread_mutex_t;
-
-
 int uthread_mutex_lock(uthread_mutex_t *mutex);
 int uthread_mutex_trylock(uthread_mutex_t *mutex);
 int uthread_mutex_unlock(uthread_mutex_t *mutex);
 
 typedef struct{
-    unsigned id;
     int size;
-    int current;
+    int begin;
+    int tail;
     thread_id* followee;
 } uthread_cond_t;
 

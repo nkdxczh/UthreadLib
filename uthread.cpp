@@ -64,7 +64,6 @@ jmp_buf* context;        // jump buffer for each thread
 bool* flag;        // jump buffer for each thread
 volatile unsigned used_thread;
 bool initialized = false;
-unsigned mutex_id = 0;
 unsigned cond_id = 0;
 
 void timer_handler (int signum)
@@ -153,8 +152,6 @@ void uthread_yield()
     curr_thread = (curr_thread + 1) % THREADS;
     while(!flag[curr_thread])curr_thread = (curr_thread + 1) % THREADS;
 
-    //printf("%d\n",curr_thread);
-
     // switch to the next thread (round robin)
     longjmp(context[curr_thread], 403);
 }
@@ -176,75 +173,56 @@ int uthread_self(){
     return curr_thread;
 }
 
-uthread_mutex_t uthread_mutex_init(){
-    uthread_mutex_t* mutex = (uthread_mutex_t*)malloc(sizeof(uthread_mutex_t));
-    mutex->taken = false;
-    mutex->id = mutex_id++;
-    return *mutex;
-}
-
 int uthread_mutex_lock(uthread_mutex_t *mutex){
-    while(mutex->taken);
-    mutex->taken = true;
-    mutex->owner = curr_thread;
+    while(!__sync_bool_compare_and_swap(mutex, 0, 1))uthread_yield();
     return 0;
 }
 
 int uthread_mutex_trylock(uthread_mutex_t *mutex){
-    if(mutex->taken)return -1;
-    mutex->taken = true;
-    mutex->owner = curr_thread;
+    if(!__sync_bool_compare_and_swap(mutex, 0, 1))return -1;
     return 0;
 }
 
 int uthread_mutex_unlock(uthread_mutex_t *mutex){
-    if(mutex->owner != curr_thread)return -1;
-    mutex->taken = false;
+    if(!__sync_bool_compare_and_swap(mutex, 1, 0))return -1;
     return 0;
 }
 
-uthread_cond_t uthread_cond_init(){
-    uthread_cond_t *cond = (uthread_cond_t*)malloc(sizeof(uthread_cond_t));
-    cond->id = cond_id++;
-    cond->current = 0;
-    cond->size = COND_BLOCK;
-    cond->followee = new thread_id[COND_BLOCK];
-    return *cond;
-}
-
 int uthread_cond_signal (uthread_cond_t* cond){
-    if(cond->current == 0)return -1;
-    cond->followee[0] = cond->followee[cond->current - 1];
-    cond->current--;
+    if(cond->begin >= cond->tail)return -1;
+    cond->begin++;
     return 0;
 }
 
 int uthread_cond_broadcast(uthread_cond_t* cond){
-    cond->current = 0;
+    if(cond->begin >= cond->tail)return -1;
+    cond->begin = 0;
+    cond->tail = 0;
     return 0;
 }
 
 void uthread_cond_expand(uthread_cond_t *cond){
     if(cond->size == 0)cond->size = 4;
     thread_id *new_followee = new thread_id[2 * cond->size];
-    memcpy(new_followee, cond->followee, cond->size * sizeof(thread_id));
+    if(cond->size > 4)memcpy(new_followee, cond->followee, cond->size  * sizeof(thread_id));
     cond->followee = new_followee;
     cond->size *= 2;
 }
 
 int uthread_cond_wait(uthread_cond_t *cond, uthread_mutex_t *mutex){
     if(uthread_mutex_unlock(mutex) != 0)return -1;
-    if(cond->current == cond->size)uthread_cond_expand(cond);
-    cond->followee[cond->current++] = curr_thread;
+    if(cond->tail == cond->size)uthread_cond_expand(cond);
+    cond->followee[cond->tail++] = curr_thread;
     bool block = true;
     do{
         block = false;
-        for(int i = 0; i < cond->current; i++){
+        for(int i = cond->begin; i < cond->tail; i++){
             if(cond->followee[i] == curr_thread){
                 block = true;
                 break;
             }
         }
+        if(block)uthread_yield();
     }while(block);
     if(uthread_mutex_lock(mutex) != 0)return -2;
     return 0;
