@@ -42,6 +42,7 @@ int main()
     uint64_t t4 = getElapsedTime();
     printf("Time for 4 threads: %lld\n", t4-t3);
 
+    // Test #3: use producer/consumers model to test mutex and cond
     uthread_mutex_t mutex1 = UTHREAD_MUTEX_INITIALIZER;
     uthread_cond_t cond = UTHREAD_COND_INITIALIZER;
     void* params[] = {(void*)&mutex1, (void*)&cond};
@@ -66,7 +67,6 @@ void* testfunc1(void* params)
     int i;
     for (i = 0; i < 1024*1024*32; ++i){
         ++counter;
-        //if(i%1000000 == 0)printf("kkk:%d\n",counter); 
     }
 }
 
@@ -79,6 +79,9 @@ void* testfunc2(void* params){
 
 }
 
+/*
+ * release 5 cond signal and then broadcast to release following threads
+ */
 void* produce(void* params){
     printf("create producer %d\n",uthread_self());
     for(int i = 0; i < 5; i++){
@@ -91,6 +94,9 @@ void* produce(void* params){
     printf("free all\n");
 }
 
+/*
+ * every consumer will wait for a cond signal
+ */
 void* consume(void* params){
     uthread_mutex_t* mutex = (uthread_mutex_t*)((void**)params)[0];
     uthread_cond_t* cond = (uthread_cond_t*)((void**)params)[1];

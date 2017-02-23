@@ -61,10 +61,9 @@ const unsigned THREADS     = 100;         // total number of threads
 volatile unsigned curr_thread;         // the current thread
 char* stack;   // stack for each thread
 jmp_buf* context;        // jump buffer for each thread
-bool* flag;        // jump buffer for each thread
-volatile unsigned used_thread;
-bool initialized = false;
-unsigned cond_id = 0;
+bool* flag;        // indicate the liveness of every thread
+volatile unsigned used_thread; // provide increasing thread id
+bool initialized = false; // indicate whether the uthread space is initialized
 
 void timer_handler (int signum)
 {
@@ -105,6 +104,9 @@ void initialize(){
     initialized = true;
 }
 
+/*
+ * encapsule function to call uthread_exit at the end
+ */
 void* end(char* args){
     void* result = ((void* (*)(void*))&args[0])((void*)(*((int*)(stack + curr_thread * 8192 + 8))));
     uthread_exit(result);
@@ -112,17 +114,22 @@ void* end(char* args){
 }
 
 int uthread_create(thread_id* t, void* (*start)(void*), void* args){
+    // initialize arrys if not
     if(!initialized)initialize();
 
     if(used_thread == THREADS-1 || setjmp(context[used_thread + 1]) != 0){
         return -1;
     }
+    
+    // generate thread id
     used_thread++;
     int new_context = used_thread;
 
+    // put function pointer and parameters pointer in stack as the parameters of end function
     memcpy(&stack[new_context * 8192 + 4], &start, sizeof start);
     memcpy(&stack[new_context * 8192 + 4 + sizeof start], &args, sizeof args);
 
+    // set thread SP and PC(end function pointer)
     ((unsigned*)context[new_context])[_SP] = xor_and_rol(&stack[(new_context) * 8192]);
     ((unsigned*)context[new_context])[_PC] = xor_and_rol((void*)end);
     flag[new_context] = true;
@@ -158,10 +165,14 @@ void uthread_yield()
 
 void uthread_exit(void* val_ptr){
     flag[curr_thread] = false;
+    // copy the return value to val_ptr
     memcpy(&stack[curr_thread * 8192 + 12], &val_ptr, sizeof val_ptr);
     uthread_yield();
 }
 
+/*
+ * loop utill the wait thread's flag become false
+ */
 int uthread_join(thread_id t, void** status){
     if(!flag[t])return -1;
     while(flag[t])uthread_yield();
@@ -188,12 +199,18 @@ int uthread_mutex_unlock(uthread_mutex_t *mutex){
     return 0;
 }
 
+/*
+ * move the begin pointer forward, release the first thread
+ */
 int uthread_cond_signal (uthread_cond_t* cond){
     if(cond->begin >= cond->tail)return -1;
     cond->begin++;
     return 0;
 }
 
+/*
+ * set both begin and tail pointer to be 0, release all thread
+ */
 int uthread_cond_broadcast(uthread_cond_t* cond){
     if(cond->begin >= cond->tail)return -1;
     cond->begin = 0;
@@ -201,6 +218,10 @@ int uthread_cond_broadcast(uthread_cond_t* cond){
     return 0;
 }
 
+/*
+ * if the original followee size is 0, set it to 8;
+ * otherwise double the size of followee array
+ */
 void uthread_cond_expand(uthread_cond_t *cond){
     if(cond->size == 0)cond->size = 4;
     thread_id *new_followee = new thread_id[2 * cond->size];
@@ -209,6 +230,9 @@ void uthread_cond_expand(uthread_cond_t *cond){
     cond->size *= 2;
 }
 
+/*
+ * block if the thread id is within begin and tail in cond's followee array
+ */
 int uthread_cond_wait(uthread_cond_t *cond, uthread_mutex_t *mutex){
     if(uthread_mutex_unlock(mutex) != 0)return -1;
     if(cond->tail == cond->size)uthread_cond_expand(cond);
