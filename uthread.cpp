@@ -166,7 +166,7 @@ void uthread_yield()
 void uthread_exit(void* val_ptr){
     flag[curr_thread] = false;
     // copy the return value to val_ptr
-    memcpy(&stack[curr_thread * 8192 + 12], &val_ptr, sizeof val_ptr);
+    memcpy(&stack[curr_thread * 8192], &val_ptr, sizeof val_ptr);
     uthread_yield();
 }
 
@@ -176,7 +176,7 @@ void uthread_exit(void* val_ptr){
 int uthread_join(thread_id t, void** status){
     if(!flag[t])return -1;
     while(flag[t])uthread_yield();
-    if(status)*status = &stack[t * 8192 + 12];
+    if(status)*status = &stack[t * 8192];
     return 0;
 }
 
