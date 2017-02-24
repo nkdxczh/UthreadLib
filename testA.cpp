@@ -25,10 +25,11 @@ int main()
 
     // Test #1: how long does it take for one thread to run?
     uint64_t t1 = getElapsedTime();
+    void* result = (void*)malloc(sizeof(int));
     THREAD_CREATE(&tid[0], testfunc2, (void*)&mutex);
-    THREAD_JOIN(tid[0], NULL);
+    THREAD_JOIN(tid[0], &result);
     uint64_t t2 = getElapsedTime();
-    printf("Time for 1 thread:  %lld\n", t2-t1);
+    printf("Time for 1 thread:  %lld, %d\n", t2-t1, *(int*)result);
 
     // Test #2: how long does it take for four threads to run?
     uint64_t t3 = getElapsedTime();
@@ -70,13 +71,15 @@ void* testfunc1(void* params)
     }
 }
 
+int result = 5;
+
 void* testfunc2(void* params){
     uthread_mutex_lock((uthread_mutex_t*)params);
     printf("thread %d lock\n",uthread_self());
     for(int i = 0; i < 1024*1023*32; i++);
     printf("thread %d unlock\n",uthread_self());
     uthread_mutex_unlock((uthread_mutex_t*)params);
-
+    return &result;
 }
 
 /*
