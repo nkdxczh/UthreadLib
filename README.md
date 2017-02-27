@@ -32,9 +32,9 @@ strcut{
 3. uthread_cond_broadcast: release all threads that are waiting for this cond.<br />
 
 ##Tests
-1. create a thread to run testfunc2. the thread request a mutex lock, execute some i++ and release the lock. get its run time and print its return value obtained by uthread_join.<br />
-2. create four threads running testfunc2. let main thread waits for them and get their run time. <br />
-3. 
+1. Create a thread to run testfunc2. The thread request a mutex lock, execute some i++ and release the lock. Get its run time and print its return value obtained by uthread_join.<br />
+2. Create four threads running testfunc2. Let main thread waits for them and get their run time. <br />
+3. Use producer/consumer model to test cond function: Create 10 consumers. They are waiting for the same cond. Then create a producer who release 5 signal and then broadcast to release the left ones.<br\>
 
 ##Make & Run
 
