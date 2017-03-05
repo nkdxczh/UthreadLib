@@ -41,3 +41,5 @@ strcut{
 Make: make in root folder
 
 Run: ./run.sh or run testA in obj folder
+
+Use "sudo apt-get install g++-multilib" to install libc6-dev-i386 package is failto make or can't find the run file.
